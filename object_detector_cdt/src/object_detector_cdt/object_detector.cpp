@@ -6,6 +6,7 @@ struct CompDouble {
 } compareDoubles;
 
 
+
 ObjectDetector::ObjectDetector(ros::NodeHandle &nh)
 {
     // Read parameters
@@ -30,15 +31,28 @@ ObjectDetector::ObjectDetector(ros::NodeHandle &nh)
     camera_cx_ = 320.5;
     camera_cy_ = 240.5;
 
+    img_height_ = 480;
+    img_width_ = 640;
+
     // Real heights of objects
     barrel_real_height_     = 1.2;   // meters 
     barrow_real_height_     = 0.7;   // meters, note: includes the wheel and frame 
     computer_real_height_   = 0.5;   // meters 
     dog_real_height_        = 0.418; // meters, note: includes legs 
-    angle_margin_ = 2*M_PI/180;
+
+    // Parameters for localisation
+    hor_angle_margin_ = 0.5*M_PI/180;
+    ver_angle_margin_ = 2*M_PI/180;
+    timeout_limit_ = 20;
+    last_time_barrel_ = 0;
+    last_time_barrow_ = 0;
+    last_time_dog_ = 0;
+    last_time_computer_ = 0;
+    max_nb_obs_ = 60;
+
 }
 
-bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, double &x_out, double &y_out, double &z_out)
+bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, Report &report_out)
 {
     sensor_msgs::PointCloud2 pc2_msg_lidar, pc2_msg_cam;
 
@@ -86,7 +100,7 @@ bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely,
         curr_hor_angle = atan2(x,z);
         curr_vert_angle = atan2(y,z);
 
-        if ((abs(curr_hor_angle- hor_angle)<angle_margin_) && (abs(curr_vert_angle - vert_angle)< angle_margin_))
+        if ((abs(curr_hor_angle- hor_angle)<hor_angle_margin_) && (abs(curr_vert_angle - vert_angle)< ver_angle_margin_))
         {
             all_x.push_back(x);
             all_y.push_back(y);
@@ -104,6 +118,11 @@ bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely,
         std::sort (all_z.begin(), all_z.end(), compareDoubles);  
 
         tf::Point pos_cam( all_x.at(all_x.size()/2),all_y.at(all_y.size()/2),all_z.at(all_z.size()/2));
+
+        report_out.cam_x_ = pos_cam.getX();
+        report_out.cam_y_ = pos_cam.getY();
+        report_out.cam_z_ = pos_cam.getZ();
+        report_out.nb_inliers_ = all_x.size();
         tf::Stamped<tf::Point> pos_cam_stamped(pos_cam,imgheader.stamp,image_frame_);
         tf::Stamped<tf::Point> pos_fixed_stamped;
 
@@ -123,10 +142,11 @@ bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely,
             ROS_ERROR("%s", ex.what());
         }
 
-
-        x_out= pos_fixed_stamped.getX();
-        y_out= pos_fixed_stamped.getY();
-        z_out= pos_fixed_stamped.getZ();
+        report_out.obj_.header.stamp = imgheader.stamp;
+        report_out.obj_.header.frame_id = fixed_frame_;
+        report_out.obj_.position.x = pos_fixed_stamped.getX();
+        report_out.obj_.position.y = pos_fixed_stamped.getY();
+        report_out.obj_.position.z = pos_fixed_stamped.getZ();
         // ROS_INFO("%f %f %f", x_out, y_out, z_out);
         return true;
     }
@@ -224,6 +244,13 @@ void ObjectDetector::lidarCallback(const sensor_msgs::PointCloud2 in_msg)
     // ROS_INFO("Last element timestamp %f", recent_lidar_scans_[recent_lidar_scans_.size()-1].header.stamp.toSec());
 }
 
+// Return report with median z prediction
+cdt_msgs::Object ObjectDetector::chooseReport(const std::vector<Report> &reports)
+{
+    std::vector<Report> reports_copy(reports);
+    std::sort (reports_copy.begin(), reports_copy.end(), compareReports_);
+    return reports_copy.at(0).obj_;
+}
 
 void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
 {
@@ -240,67 +267,91 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
     // Convert message to OpenCV image
     convertMessageToImage(in_msg, image, timestamp);
 
+    Report report;
     if(!wasObjectDetected("dog"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::RED, in_msg->header,  new_object.position.x,  new_object.position.y,  new_object.position.z);
+        bool valid_object = recognizeObject(image, Colour::RED, in_msg->header, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
-            new_object.id = "dog";
-            new_object.header.stamp = timestamp;
-            new_object.header.frame_id = fixed_frame_;
-            detected_objects_.objects.push_back(new_object);
+            report.obj_.id = "dog";
+            // new_object.header.stamp = timestamp;
+            // new_object.header.frame_id = fixed_frame_;
+            detected_dogs_.push_back(report);
+            // detected_objects_.objects.push_back(report.obj_);
             ROS_INFO("Found a dog!");
+            last_time_dog_ = timestamp.toSec();
+        }
+        if (detected_dogs_.size() > 0 && ((ros::Time::now().toSec() - last_time_dog_) > timeout_limit_ || detected_dogs_.size() > max_nb_obs_)){
+            detected_objects_.objects.push_back(chooseReport(detected_dogs_));
         }
     }
     if(!wasObjectDetected("barrow"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::GREEN, in_msg->header,  new_object.position.x,  new_object.position.y,  new_object.position.z);
+        bool valid_object = recognizeObject(image, Colour::GREEN, in_msg->header, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
-            new_object.id = "barrow";
-            new_object.header.stamp = timestamp;
-            new_object.header.frame_id = fixed_frame_;
-            detected_objects_.objects.push_back(new_object);
+            report.obj_.id = "barrow";
+            // new_object.header.stamp = timestamp;
+            // new_object.header.frame_id = fixed_frame_;
+            detected_barrows_.push_back(report);
+            // detected_objects_.objects.push_back(report.obj_);
+
             ROS_INFO("Found a barrow!");
+            last_time_barrow_ = timestamp.toSec();
+        }
+        if (detected_barrows_.size() > 0 && ((ros::Time::now().toSec() - last_time_barrow_) > timeout_limit_ || detected_barrows_.size() > max_nb_obs_)){
+            detected_objects_.objects.push_back(chooseReport(detected_barrows_));
         }
     }
     if(!wasObjectDetected("barrel"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::YELLOW, in_msg->header,  new_object.position.x,  new_object.position.y,  new_object.position.z);
+        bool valid_object = recognizeObject(image, Colour::YELLOW, in_msg->header, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
-            new_object.id = "barrel";
-            new_object.header.stamp = timestamp;
-            new_object.header.frame_id = fixed_frame_;
-            detected_objects_.objects.push_back(new_object);
+            report.obj_.id = "barrel";
+            // new_object.header.stamp = timestamp;
+            // new_object.header.frame_id = fixed_frame_;
+            detected_barrels_.push_back(report);
+            // detected_objects_.objects.push_back(report.obj_);
+
             ROS_INFO("Found a barrel!");
+            last_time_barrel_ = timestamp.toSec();
         }
+        if (detected_barrels_.size() > 0 && ((ros::Time::now().toSec() - last_time_barrel_) > timeout_limit_ || detected_barrels_.size() > max_nb_obs_)){
+            detected_objects_.objects.push_back(chooseReport(detected_barrels_));
+        }
+
     }
     if(!wasObjectDetected("computer"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::BLUE, in_msg->header,  new_object.position.x,  new_object.position.y,  new_object.position.z);
+        bool valid_object = recognizeObject(image, Colour::BLUE, in_msg->header, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
-            new_object.id = "computer";
-            new_object.header.stamp = timestamp;
-            new_object.header.frame_id = fixed_frame_;
-            detected_objects_.objects.push_back(new_object);
+            report.obj_.id = "computer";
+            // new_object.header.stamp = timestamp;
+            // new_object.header.frame_id = fixed_frame_;
+            detected_computers_.push_back(report);
+            // detected_objects_.objects.push_back(report.obj_);
+
             ROS_INFO("Found a computer!");
+            last_time_computer_ = timestamp.toSec();
+        }
+        if (detected_computers_.size() > 0 && ((ros::Time::now().toSec() - last_time_computer_) > timeout_limit_ || detected_computers_.size() > max_nb_obs_)){
+            detected_objects_.objects.push_back(chooseReport(detected_computers_));
         }
     }
-
 
     // Publish list of objects detected so far
     objects_pub_.publish(detected_objects_);
@@ -436,7 +487,7 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
 
 
 bool ObjectDetector::recognizeObject(const cv::Mat &in_image, const Colour &colour, const std_msgs::Header &in_header, 
-                                  double& x_map, double& y_map, double& z_map)
+                                  Report &report_out)
 {
     double obj_center_x;
     double obj_center_y;
@@ -446,14 +497,21 @@ bool ObjectDetector::recognizeObject(const cv::Mat &in_image, const Colour &colo
     cv::Mat in_image_filt = applyColourFilter(in_image, colour);
     cv::Mat in_image_bounding_box = applyBoundingBox(in_image_filt, obj_center_x, obj_center_y, obj_image_width, obj_image_height);
 
-    if (obj_center_x < 0 || obj_image_width < 50 || obj_image_height < 50)
+    if (obj_center_x < 0 || obj_image_width < 30 || obj_image_height < 30)
     {
         return false;
     }
 
-
-    if(getObjectPosition(obj_center_x,obj_center_y,in_header,x_map, y_map, z_map))
+    // Check not on the edge
+    if ((obj_center_x + obj_image_width/2 > img_width_ - 5) || (obj_center_y + obj_image_height/2 > img_height_ - 5) || (obj_center_x - obj_image_width/2 < 5) || (obj_center_y - obj_image_height/2 < 5))
     {
+        return false;
+    }
+
+    if(getObjectPosition(obj_center_x,obj_center_y,in_header,report_out))
+    {
+        report_out.bb_width_ = obj_image_width;
+        report_out.bb_height_ = obj_image_height;
         return true;
     }
     else
@@ -463,6 +521,7 @@ bool ObjectDetector::recognizeObject(const cv::Mat &in_image, const Colour &colo
 }
 bool ObjectDetector::wasObjectDetected(std::string object_name)
 {
+    // return false;
     bool detected = false;
     for(auto obj : detected_objects_.objects)
     {

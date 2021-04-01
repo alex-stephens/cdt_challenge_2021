@@ -77,11 +77,19 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
             //double curr_cost = dist; // (10+hor_angle)/dist;
 
 
-            if (dist<2.0)
+            if ((add_cost < 1000) && (dist<2.0))
             {
                 add_cost = 1000;
                 ROS_ERROR("%f", add_cost);
                 break;
+            }
+            else if ((add_cost < 500) && (dist<3.0))
+            {
+                add_cost = 500;
+            }
+            else if ((add_cost < 200) && (dist<4.0))
+            {
+                add_cost = 200;
             }
 
         }
