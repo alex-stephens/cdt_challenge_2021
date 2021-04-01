@@ -58,15 +58,7 @@ void WorldModelling::readParameters(ros::NodeHandle &nh)
 
     nh.param("trav_check_distance", trav_check_distance_, 0.3f);
     nh.param("trav_gradient_limit", trav_gradient_limit_, 0.1f);
-
-
-    // Set up traversability filter
-    // grid_map::NormalVectorsFilter<grid_map::GridMap> surface_normal_filter_ = grid_map::NormalVectorsFilter<grid_map::GridMap>();
-    // // Configuration of chain filter.
-    // if (!surface_normal_filter_.configure()) {
-    //     ROS_ERROR("Could not configure the filter chain!");
-    // }
-
+    
 }
 
 void WorldModelling::elevationMapCallback(const grid_map_msgs::GridMap &in_grid_map)
@@ -114,7 +106,6 @@ float WorldModelling::distanceBetweenNodes(cdt_msgs::GraphNode n1, cdt_msgs::Gra
     float x2 = n2.pose.position.x; 
     float y2 = n2.pose.position.y; 
     
-    // ROS_INFO_STREAM("Distance" << std::hypot(x1 - x2, y1 - y2));
     return std::hypot(x1 - x2, y1 - y2); 
 }
 
@@ -153,8 +144,6 @@ bool WorldModelling::updateGraph(const float &x, const float &y, const float &th
         new_node_id.data = num_nodes_;
 
         for (int i = 0; i < num_nodes_; i++) {
-            // ROS_INFO_STREAM("Neighbour distance " << neighbor_distance_);
-            // ROS_INFO_STREAM("Neighbour path distance " << neighbor_path_distance_ << ", " << new_node.id.data - i << ", " << i);
             if (distanceBetweenNodes(new_node, exploration_graph_.nodes[i]) > neighbor_distance_) 
             {
                 continue;
@@ -184,33 +173,6 @@ bool WorldModelling::updateGraph(const float &x, const float &y, const float &th
     return true;
 }
 
-float WorldModelling::getSlopeAtIndex(const grid_map::Index index) 
-
-{
-    auto size = traversability_.getSize();
-    const float step = traversability_.getResolution();
-
-    float s_max = 0.0;
-    float base_elev = traversability_.at("elevation", index);
-    float v1, v2, v3, v4; 
-
-    if (index.x() > 0 && index.x() < size.x() - 1 && index.x() > 0 && index.y() < size.y() - 1) 
-    {
-        v1 = traversability_.at("elevation", grid_map::Index(index.x() - 1, index.y()));
-        v2 = traversability_.at("elevation", grid_map::Index(index.x(), index.y() - 1));
-        v3 = traversability_.at("elevation", grid_map::Index(index.x() + 1, index.y()));
-        v4 = traversability_.at("elevation", grid_map::Index(index.x(), index.y() + 1));
-
-        s_max = std::max(s_max, std::abs(base_elev - v1));
-        s_max = std::max(s_max, std::abs(base_elev - v2));
-        s_max = std::max(s_max, std::abs(base_elev - v3));
-        s_max = std::max(s_max, std::abs(base_elev - v4));
-    }
-
-    // ROS_INFO_STREAM("Slope value: " << s_max / step << ", " << s_max << ", " << step);
-    return s_max / step;
-}
-
 void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
 {
     // Prepare size of grid map
@@ -218,6 +180,7 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
 
     // Copy elevation from input grid map to traversability grid map
     traversability_.add("elevation", grid_map["elevation_inpainted"]);
+
     // Copy slope from input grid map to traversability grid map
     traversability_.add("slope", grid_map["slope_inpainted"]);
 
@@ -250,10 +213,8 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
             grid_map::Position query_point;
             int xi, yi;
 
-            float min_elev = 1000;
-            float max_elev = -1000;
             float max_slope = 0.0;
-            float elev;
+            float elev, slope;
 
             // elevation diff in area
             for (int i = 0; i < steps; i++)
@@ -269,31 +230,19 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
                         continue;
                     }
 
-                    elev = traversability_.at("elevation", index);
+                    slope = traversability_.at("slope", index);
 
-                    // Update slope and min/max elevation 
-                    max_slope = std::max(max_slope, getSlopeAtIndex(index));
-                    min_elev = std::min(elev, min_elev);
-                    max_elev = std::max(elev, max_elev);
-
-                    if (trav_value < 0) break;
+                    // Update slope 
+                    max_slope = std::max(max_slope, slope);
                 } 
 
                 // If difference of elevations is too large, non-traversable
-                // ROS_INFO_STREAM("Max slope and gradient limit" << max_slope << ", " << trav_gradient_limit_);
-                if (max_elev - min_elev > 0.4 || max_slope > trav_gradient_limit_) {
+                if (max_slope > trav_gradient_limit_) {
                     trav_value = -1.0;
                 }
 
                 if (trav_value < 0) break;
             }
-
-            // ROS_INFO_STREAM("Min and max elev: " << min_elev << ", " << max_elev << ", " << trav_value);
-
-
-            // if (traversability_.at("elevation", *iterator) < elevation_threshold_) {
-            //     trav_value = 1.0;
-            // }
 
             traversability_.at("traversability", *iterator) = trav_value;
         }
@@ -313,12 +262,6 @@ void WorldModelling::findCurrentFrontiers(const float &x, const float &y, const 
     float theta_deg = theta * 180 / M_PI;
     float range = frontier_search_angle_;
     current_frontiers_.frontiers.clear();
-
-    // All existing frontiers are kept
-    // for (auto f : frontiers_.frontiers) {
-    //     current_frontiers_.frontiers.push_back(f);
-    // }
-
 
     for (float angle = theta_deg - range/2; angle < theta_deg + range/2; angle+=frontier_search_angle_resolution_) 
     {
@@ -415,7 +358,6 @@ void WorldModelling::updateFrontiers(const float &x, const float &y, const float
         }
         
         // If the previous test are passed, add frontier to filtered list
-        // filtered_frontiers.frontiers.push_back(frontier);
         filtered_frontiers.frontiers.push_back(frontier);
     }
 
@@ -473,9 +415,6 @@ void WorldModelling::updateFrontiers(const float &x, const float &y, const float
         frontiers_.frontiers.push_back(frontier);
         all_frontiers_.frontiers.push_back(frontier);
     }
-
-    // Finally, we update the frontiers using the current ones
-    // frontiers_ = current_frontiers_;
 }
 
 void WorldModelling::publishData(const grid_map_msgs::GridMapInfo &in_grid_map_info)

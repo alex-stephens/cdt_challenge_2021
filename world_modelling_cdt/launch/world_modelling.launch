@@ -37,7 +37,7 @@
     <param name="frontier_search_angle"               value="135"/> <!-- Degrees -->
 
     <param name="trav_check_distance"                 value="0.2"/>
-    <param name="trav_gradient_limit"                 value="0.1"/>
+    <param name="trav_gradient_limit"                 value="0.25"/>
   
   </node>
 
