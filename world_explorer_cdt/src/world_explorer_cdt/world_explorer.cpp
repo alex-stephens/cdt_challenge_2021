@@ -171,7 +171,6 @@ void WorldExplorer::plan()
         // Local Planner (RRT)
         // TODO Plan a route to the most suitable frontier
         int goal_ind = 0;
-        bool success = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
         while (!local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_)){
             goal_ind++;
             if (goal_ind >= goals.size()) {

@@ -122,7 +122,7 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
     // TODO think and implement other planner...
     // Code adapted from https://www.includehelp.com/cpp-tutorial/dijkstras-algorithm.aspx
 
-    int vertex = graph.size();
+    int vertex = graph.rows();
 
 	double dist[vertex];                             
 	bool Dset[vertex];
