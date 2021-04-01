@@ -40,7 +40,6 @@ class WorldModelling
     float neighbor_distance_;
     int neighbor_path_distance_;
     float node_creation_distance_;
-    float elevation_threshold_;
     float max_distance_to_search_frontiers_;
     float distance_to_delete_frontier_;
     float frontier_search_angle_resolution_;
@@ -68,7 +67,6 @@ class WorldModelling
     bool first_frontier_;
 
     // Other variables
-    float trav_check_distance_;
     float trav_gradient_limit_;
 
 public:

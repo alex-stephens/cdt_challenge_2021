@@ -47,7 +47,6 @@ void WorldModelling::readParameters(ros::NodeHandle &nh)
     nh.param("output_frontiers_topic", output_frontiers_topic_, std::string("/frontiers"));
     nh.param("node_creation_distance", node_creation_distance_, 1.f);
     nh.param("neighbor_distance", neighbor_distance_, 1.f);
-    nh.param("elevation_threshold", elevation_threshold_, 0.1f);
     nh.param("neighbor_path_distance", neighbor_path_distance_, 5);
 
     nh.param("max_distance_to_search_frontiers", max_distance_to_search_frontiers_, 3.f);
@@ -56,7 +55,6 @@ void WorldModelling::readParameters(ros::NodeHandle &nh)
     nh.param("frontier_search_angle", frontier_search_angle_, 180.f);
     nh.param("frontier_min_separation", frontier_min_separation_, 2.f);
 
-    nh.param("trav_check_distance", trav_check_distance_, 0.3f);
     nh.param("trav_gradient_limit", trav_gradient_limit_, 0.1f);
     
 }
@@ -196,55 +194,24 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
         // We only want to use the valid values
         if (traversability_.isValid(*iterator, "elevation"))
         {
-
-            // TODO Fill the traversability at each position using some criterion based on the other layers
-            // How can we figure out if an area is traversable or not?
-            // YOu should fill with a 1.0 if it's traversable, and -1.0 in the other case
-
-
-            // Currently just using a really simple approach - if the elevation is too large, it's not traversable
             float trav_value = 1.0;
+            float max_slope = 0.0;
+            float slope;
 
             grid_map::Index index = iterator.getUnwrappedIndex();
 
-            int steps = trav_check_distance_ / step;
-            int x_start = index.x() - steps/2;
-            int y_start = index.y() - steps/2;
-            grid_map::Position query_point;
-            int xi, yi;
+            // Update slope 
+            slope = traversability_.at("slope", index);
+            max_slope = std::max(max_slope, slope);
 
-            float max_slope = 0.0;
-            float elev, slope;
-
-            // elevation diff in area
-            for (int i = 0; i < steps; i++)
+            // If slope is too large, non-traversable
+            if (max_slope > trav_gradient_limit_) 
             {
-                for (int j = 0; j < steps; j++) 
-                {
-                    xi = x_start + i;
-                    yi = y_start + j;
-                    index = grid_map::Index(xi, yi);
-
-                    if (!traversability_.isValid(index))
-                    {
-                        continue;
-                    }
-
-                    slope = traversability_.at("slope", index);
-
-                    // Update slope 
-                    max_slope = std::max(max_slope, slope);
-                } 
-
-                // If difference of elevations is too large, non-traversable
-                if (max_slope > trav_gradient_limit_) {
-                    trav_value = -1.0;
-                }
-
-                if (trav_value < 0) break;
+                trav_value = -1.0;
             }
 
             traversability_.at("traversability", *iterator) = trav_value;
+
         }
     }
 
