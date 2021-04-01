@@ -118,10 +118,10 @@ void WorldExplorer::frontiersCallback(const cdt_msgs::Frontiers& in_frontiers)
 void WorldExplorer::graphCallback(const cdt_msgs::Graph& in_graph)
 {
     // Set the graph structure to graph planner
-    int num_nodes = graph_.nodes.size();
-    if (num_nodes != in_graph.nodes.size()){
-        graph_navigation_ = false;
-    }
+    // int num_nodes = graph_.nodes.size();
+    // if (num_nodes != in_graph.nodes.size()){
+    //     graph_navigation_ = false;
+    // }
     graph_planner_.setGraph(in_graph);
     graph_ = in_graph;
 }
@@ -170,21 +170,25 @@ void WorldExplorer::plan()
 
         // TODO Choose a frontier, work it off if it is valid and send it to the position controller
         // here we just use the first one as an example
-        Eigen::Vector2d pose_goal = goals.at(0);
-        if (local_planner_.isInTraversablity(pose_goal)) {  // Only use local planner if it can reach that goal effectivelly
-            graph_navigation_ = false;
+        int goal_ind = -1;
+        Eigen::Vector2d pose_goal;
+        bool have_plan = false;
+        do {
             // Local Planner (RRT)
-            // TODO Plan a route to the most suitable frontier
-            int goal_ind = 0;
-            while (!local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_)){
-                goal_ind++;
-                if (goal_ind >= goals.size()) {
-                    ROS_INFO("Can't find a suitable frontier with a path");
-                    break;
-                }
-                Eigen::Vector2d pose_goal = goals.at(goal_ind);
+            goal_ind++;
+            if (goal_ind >= goals.size()) {
+                ROS_INFO("Can't find a suitable frontier with a path");
+                break;
             }
-        } else {
+            ROS_INFO("Checking %d", goal_ind);
+            pose_goal = goals.at(goal_ind);
+            if (local_planner_.isInTraversablity(pose_goal))
+                have_plan = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+        } while (!have_plan);
+
+
+        if (!have_plan) {
+            pose_goal = goals.at(0);
             ROS_INFO("Plotting a path with Dijkstra");
             if (!graph_navigation_)
             {
@@ -193,14 +197,27 @@ void WorldExplorer::plan()
             } else {
                 ROS_INFO("Following old plan");
             }
+            double dist = 0;
+            for (int i = 0; i < route_.size(); i++) {
+                dist = std::hypot(robot_x - route_.back().x(), robot_y - route_.back().y());
+                if (dist < 0.3) {
+                    route_.pop_back();
+                } else {
+                    break;
+                }
+            }
+        } else {
+            graph_navigation_ = false;
         }
 
         // TODO Graph Planner
         //graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
 
         // If we have route targets (frontiers), work them off and send to position controller
+
         if(route_.size() > 0)
         {
+            ROS_INFO("Navigating");
             // Create goal message
             float step = 0.2;
             Eigen::Isometry3d pose1;
@@ -208,32 +225,81 @@ void WorldExplorer::plan()
             pose1.translate(Eigen::Vector3d(robot_x, robot_y, 0));
             Eigen::Isometry3d pose2;
 
-            int i = 0;
-            bool push_goal_forwards = true;
-            while (push_goal_forwards && i < route_.size()) 
-            {
-                pose2.setIdentity();
-                pose2.translate(Eigen::Vector3d(route_[i].x(), route_[i].y(), 0));
-                if (!local_planner_.isStraightPathValid(pose1, pose2, step))
-                {
-                    break;
-                }
-                i++;
-            } 
+            geometry_msgs::PoseStamped target;
 
-            if (i == route_.size()) {
-                i--;
+            int i = 0;
+            if (graph_navigation_) {
+                // i = route_.size()-1;
+                // double min_dist = 10000000;
+                // int nav_goal_id = -1;
+                // int nearest_goal_id = -1;
+                // for(; i >=0; i--) {
+                //     double dist = std::hypot(robot_x - route_[i].x(), robot_y - route_[i].y());
+                //     pose2.setIdentity();
+                //     pose2.translate(Eigen::Vector3d(route_[i].x(), route_[i].y(), 0));
+                //     if (nav_goal_id == -1 && dist < 1.6 && local_planner_.isStraightPathValid(pose1, pose2, step)) {
+                //         nav_goal_id = i; // set it to the first goal within 
+                //     }
+                //     if (dist < min_dist) {
+                //         min_dist = dist;
+                //         nearest_goal_id = i;
+                //     }
+                // }
+                // if (nav_goal_id < 0) { // if we did not find one within lookahead
+                //     if (nearest_goal_id >= 0 ) {
+                //         nav_goal_id = nearest_goal_id; // go to nearest
+                //     } else {
+                //         nav_goal_id = 0; // or to start
+                //         graph_navigation_ = false; // and replan
+                //         ROS_INFO("Forcing replan");
+                //     }
+                // }
+                // i = nav_goal_id;
+                // double dist = 0;
+                // for (int i = 0; i < route_.size(); i++) {
+                //     dist = std::hypot(robot_x - route_.back.x(), robot_y - route_.back.y());
+                //     if (dist < 0.3) {
+                //         route_.pop_back();
+                //     } else {
+                //         break;
+                //     }
+                // }
+                target.pose.position.x = route_.back().x();
+                target.pose.position.y = route_.back().y();
+                target.pose.position.z = 0.25;
+                target.header.frame_id = goal_frame_;
+
+            } else {
+
+
+
+                bool push_goal_forwards = true;
+                while (push_goal_forwards && i < route_.size()) 
+                {
+                    pose2.setIdentity();
+                    pose2.translate(Eigen::Vector3d(route_[i].x(), route_[i].y(), 0));
+                    if (!local_planner_.isStraightPathValid(pose1, pose2, step))
+                    {
+                        break;
+                    }
+                    i++;
+                } 
+
+                if (i == route_.size()) {
+                    i--;
+                }
+
+                // target.pose.position.x = route_.begin()->x();
+                // target.pose.position.y = route_.begin()->y();
+                target.pose.position.x = route_[i].x();
+                target.pose.position.y = route_[i].y();
+                target.pose.position.z = 0.25;
+                target.header.frame_id = goal_frame_;
             }
 
-            geometry_msgs::PoseStamped target;
-            // target.pose.position.x = route_.begin()->x();
-            // target.pose.position.y = route_.begin()->y();
-            target.pose.position.x = route_[i].x();
-            target.pose.position.y = route_[i].y();
-            target.pose.position.z = 0.25;
-            target.header.frame_id = goal_frame_;
             goal_pub_.publish(target);
             ROS_DEBUG_STREAM("Sending target " << route_.begin()->transpose());
+
 
             // Visualize route (plan)
             nav_msgs::Path plan;
@@ -243,15 +309,27 @@ void WorldExplorer::plan()
             pose.pose.position.x = robot_x;
             pose.pose.position.y = robot_y;
             pose.pose.position.z = 0.25; // This is to improve the visualization only
-            plan.poses.push_back(pose);
-
-            for(auto carrot : route_){
-                geometry_msgs::PoseStamped pose;
-                pose.pose.position.x = carrot.x();
-                pose.pose.position.y = carrot.y();
-                pose.pose.position.z = 0.25; // This is to improve the visualization only
+            if (graph_navigation_) {
+                for(auto carrot : route_){
+                    geometry_msgs::PoseStamped pose;
+                    pose.pose.position.x = carrot.x();
+                    pose.pose.position.y = carrot.y();
+                    pose.pose.position.z = 0.25; // This is to improve the visualization only
+                    plan.poses.push_back(pose);
+                }
                 plan.poses.push_back(pose);
+                std::reverse(plan.poses.begin(),plan.poses.end());
+            } else {
+                plan.poses.push_back(pose);
+                for(auto carrot : route_){
+                    geometry_msgs::PoseStamped pose;
+                    pose.pose.position.x = carrot.x();
+                    pose.pose.position.y = carrot.y();
+                    pose.pose.position.z = 0.25; // This is to improve the visualization only
+                    plan.poses.push_back(pose);
+                }
             }
+            
             plan_pub_.publish(plan);
         } 
     }
@@ -265,16 +343,25 @@ void WorldExplorer::plan()
 
         Eigen::Vector2d pose_goal = Eigen::Vector2d(home_pose.position.x, home_pose.position.y);
         graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+        double dist = 0;
+        for (int i = 0; i < route_.size(); i++) {
+            dist = std::hypot(robot_x - route_.back().x(), robot_y - route_.back().y());
+            if (dist < 0.3) {
+                route_.pop_back();
+            } else {
+                break;
+            }
+        }
         if(route_.size() > 0)
         {
             // Create goal message
             geometry_msgs::PoseStamped target;
-            target.pose.position.x = route_.begin()->x();
-            target.pose.position.y = route_.begin()->y();
+            target.pose.position.x = route_.back()->x();
+            target.pose.position.y = route_.back()->y();
             target.pose.position.z = 0.25;
             target.header.frame_id = goal_frame_;
             goal_pub_.publish(target);
-            ROS_DEBUG_STREAM("Sending target " << route_.begin()->transpose());
+            ROS_DEBUG_STREAM("Sending target " << route_.back()->transpose());
 
             // Visualize route (plan)
             nav_msgs::Path plan;
@@ -284,7 +371,6 @@ void WorldExplorer::plan()
             pose.pose.position.x = robot_x;
             pose.pose.position.y = robot_y;
             pose.pose.position.z = 0.25; // This is to improve the visualization only
-            plan.poses.push_back(pose);
 
             for(auto carrot : route_){
                 geometry_msgs::PoseStamped pose;
@@ -293,6 +379,9 @@ void WorldExplorer::plan()
                 pose.pose.position.z = 0.25; // This is to improve the visualization only
                 plan.poses.push_back(pose);
             }
+            plan.poses.push_back(pose);
+            std::reverse(plan.poses.begin(),plan.poses.end());
+            
             plan_pub_.publish(plan);
         } 
     }
