@@ -57,15 +57,22 @@ void GraphPlanner::findClosestNodes(const double& robot_x, const double& robot_y
 
 void GraphPlanner::generateGraphFromMsg(Eigen::MatrixXd & graph)
 {   
-    
     graph.setZero(); //=Eigen::MatrixXd::Zero();
     // int gsize = graph_.nodes.size();
     // graph.resize(gsize, gsize);
+    std_msgs::Int32 prev_id, next_id;
     for (auto node: graph_.nodes)
     {
+        if (node.id.data > 0){
+            prev_id.data = node.id.data-1;
+            node.neighbors_id.push_back(prev_id);
+        }
+        if (node.id.data < node.neighbors_id.size()-1){
+            next_id.data = node.id.data+1;
+            node.neighbors_id.push_back(next_id);
+        }
         double x_pos = node.pose.position.x;
         double y_pos = node.pose.position.y;
-
         for (auto neighbour_id: node.neighbors_id)
         {
             if (graph(node.id.data, neighbour_id.data)==0)
@@ -86,9 +93,7 @@ bool GraphPlanner::planPath(const double& robot_x,
                             Eigen::Vector2d goal_pose,
                             std::vector<Eigen::Vector2d>& route)
 {
-       
     std::vector<geometry_msgs::Pose> graph_nodes;
-    
     findClosestNodes(robot_x, robot_y, robot_theta, goal_pose, graph_nodes);    
 
     Eigen::Vector2d goal(graph_nodes.at(0).position.x, graph_nodes.at(0).position.y);
@@ -96,15 +101,11 @@ bool GraphPlanner::planPath(const double& robot_x,
 
     int goal_id = getGraphID(goal.x(), goal.y());
     int start_id = getGraphID(start.x(), start.y());
-
     int no_vertices = graph_.nodes.size();
 
     Eigen::MatrixXd graph(no_vertices, no_vertices);
-
     generateGraphFromMsg(graph);
-
     dijkstra(graph, start_id, goal_id, route);
-
     return true;
 }   
 
@@ -135,7 +136,6 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
         path[i] = -1;
 	}
 	dist[start_id]=0; /*Initialize the distance of the source vertec to zero*/
-
 	for(int c=0;c<vertex;c++)                           
 	{
 		int u = minimumDist(dist,Dset);  /*u is any vertex that is not yet included in Dset and has minimum distance*/
@@ -144,7 +144,7 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
 		for(int v=0;v<vertex;v++)                  
 		/*Update dist[v] if not in Dset and their is a path from src to v through u that has distance minimum than current value of dist[v]*/
 		{
-			if(!Dset[v] && graph(u,v) && dist[u]!=1e5 && dist[u]+graph(u,v)<dist[v])
+			if(!Dset[v] && graph(u,v) && dist[u]!=1e5 && ((dist[u]+graph(u,v))<dist[v]))
             {
                 dist[v] = dist[u]+graph(u,v);
                 path[v] = u;
@@ -159,9 +159,12 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
 
     Eigen::Vector2d start(graph_.nodes.at(start_id).pose.position.x, graph_.nodes.at(start_id).pose.position.y);
     int current_node_id = goal_id;
+
     while (current_node_id!=start_id)
     {
+
         int next_node_id = path[current_node_id];
+
         Eigen::Vector2d node(graph_.nodes.at(next_node_id).pose.position.x, graph_.nodes.at(next_node_id).pose.position.y);
         route.push_back(node);
         current_node_id = next_node_id;

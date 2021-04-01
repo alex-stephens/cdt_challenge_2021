@@ -250,7 +250,8 @@ void WorldExplorer::plan()
         // TODONE: Implement something to indicate it ended and optionally go to the home position
         double robot_x, robot_y, robot_theta;
         getRobotPose2D(robot_x, robot_y, robot_theta);
-        auto home_pose = exploration_graph_.nodes[0].pose;
+        auto home_pose = graph_.nodes[0].pose;
+
         Eigen::Vector2d pose_goal = Eigen::Vector2d(home_pose.position.x, home_pose.position.y);
         graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
         if(route_.size() > 0)
