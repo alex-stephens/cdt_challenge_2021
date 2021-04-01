@@ -103,6 +103,7 @@ class ObjectDetector
     
     // Objects' heights
     double barrel_real_height_, barrow_real_height_, computer_real_height_, dog_real_height_;
+    double barrel_real_radius_, barrow_real_radius_, computer_real_radius_, dog_real_radius_;
     double hor_angle_margin_, ver_angle_margin_;
 public:
     // Constructor
@@ -113,7 +114,7 @@ private:
     void readParameters(ros::NodeHandle &nh);
 
     //Determine object position
-    bool getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, Report &report);
+    bool getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, double obj_depth, Report &report);
 
     // Find object to report from multiple observations
     cdt_msgs::Object chooseReport(const std::vector<Report> &reports);
@@ -139,7 +140,7 @@ private:
 
     // Implements the procedures to recognize objects
 
-    bool recognizeObject(const cv::Mat &in_image, const Colour &colour, const std_msgs::Header &in_header, 
+    bool recognizeObject(const cv::Mat &in_image, const Colour &colour, const std_msgs::Header &in_header, double obj_depth, 
                                   Report &report_out);
                                   
     bool wasObjectDetected(std::string object_name);

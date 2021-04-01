@@ -40,6 +40,12 @@ ObjectDetector::ObjectDetector(ros::NodeHandle &nh)
     computer_real_height_   = 0.5;   // meters 
     dog_real_height_        = 0.418; // meters, note: includes legs 
 
+    // Real heights of objects
+    barrel_real_radius_     = 0.55;   // meters 
+    barrow_real_radius_     = 0.7;   // meters, note: includes the wheel and frame 
+    computer_real_radius_   = 0.2;   // meters 
+    dog_real_radius_        = 0.15; // meters, note: includes legs 
+
     // Parameters for localisation
     hor_angle_margin_ = 0.5*M_PI/180;
     ver_angle_margin_ = 2*M_PI/180;
@@ -52,7 +58,7 @@ ObjectDetector::ObjectDetector(ros::NodeHandle &nh)
 
 }
 
-bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, Report &report_out)
+bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, double obj_depth, Report &report_out)
 {
     sensor_msgs::PointCloud2 pc2_msg_lidar, pc2_msg_cam;
 
@@ -117,7 +123,7 @@ bool ObjectDetector::getObjectPosition(const float &pixelx, const float &pixely,
         std::sort (all_y.begin(), all_y.end(), compareDoubles);  
         std::sort (all_z.begin(), all_z.end(), compareDoubles);  
 
-        tf::Point pos_cam( all_x.at(all_x.size()/2),all_y.at(all_y.size()/2),all_z.at(all_z.size()/2));
+        tf::Point pos_cam( all_x.at(all_x.size()/2),all_y.at(all_y.size()/2),all_z.at(all_z.size()/2) + obj_depth);
 
         report_out.cam_x_ = pos_cam.getX();
         report_out.cam_y_ = pos_cam.getY();
@@ -271,12 +277,13 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
     if(!wasObjectDetected("dog"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::RED, in_msg->header, report);
+        bool valid_object = recognizeObject(image, Colour::RED, in_msg->header, dog_real_radius_, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
             report.obj_.id = "dog";
+            report.obj_.position.z -= dog_real_height_/2;
             // new_object.header.stamp = timestamp;
             // new_object.header.frame_id = fixed_frame_;
             detected_dogs_.push_back(report);
@@ -291,12 +298,13 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
     if(!wasObjectDetected("barrow"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::GREEN, in_msg->header, report);
+        bool valid_object = recognizeObject(image, Colour::GREEN, in_msg->header, barrow_real_radius_, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
             report.obj_.id = "barrow";
+            report.obj_.position.z -= barrow_real_height_/2;
             // new_object.header.stamp = timestamp;
             // new_object.header.frame_id = fixed_frame_;
             detected_barrows_.push_back(report);
@@ -312,12 +320,13 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
     if(!wasObjectDetected("barrel"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::YELLOW, in_msg->header, report);
+        bool valid_object = recognizeObject(image, Colour::YELLOW, in_msg->header, barrel_real_radius_, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
             report.obj_.id = "barrel";
+            report.obj_.position.z -= barrel_real_height_/2;
             // new_object.header.stamp = timestamp;
             // new_object.header.frame_id = fixed_frame_;
             detected_barrels_.push_back(report);
@@ -334,12 +343,13 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
     if(!wasObjectDetected("computer"))
     {
         cdt_msgs::Object new_object;
-        bool valid_object = recognizeObject(image, Colour::BLUE, in_msg->header, report);
+        bool valid_object = recognizeObject(image, Colour::BLUE, in_msg->header, computer_real_radius_, report);
 
         // If recognized, add to list of detected objects
         if (valid_object)
         {
             report.obj_.id = "computer";
+            report.obj_.position.z -= computer_real_height_/2;
             // new_object.header.stamp = timestamp;
             // new_object.header.frame_id = fixed_frame_;
             detected_computers_.push_back(report);
@@ -486,7 +496,7 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
 }
 
 
-bool ObjectDetector::recognizeObject(const cv::Mat &in_image, const Colour &colour, const std_msgs::Header &in_header, 
+bool ObjectDetector::recognizeObject(const cv::Mat &in_image, const Colour &colour, const std_msgs::Header &in_header, double obj_depth, 
                                   Report &report_out)
 {
     double obj_center_x;
@@ -508,7 +518,7 @@ bool ObjectDetector::recognizeObject(const cv::Mat &in_image, const Colour &colo
         return false;
     }
 
-    if(getObjectPosition(obj_center_x,obj_center_y,in_header,report_out))
+    if(getObjectPosition(obj_center_x,obj_center_y,in_header,obj_depth,report_out))
     {
         report_out.bb_width_ = obj_image_width;
         report_out.bb_height_ = obj_image_height;
