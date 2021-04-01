@@ -171,7 +171,6 @@ void WorldExplorer::plan()
         // Local Planner (RRT)
         // TODO Plan a route to the most suitable frontier
         int goal_ind = 0;
-        bool success = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
         while (!local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_)){
             goal_ind++;
             if (goal_ind >= goals.size()) {
@@ -190,9 +189,34 @@ void WorldExplorer::plan()
         if(route_.size() > 0)
         {
             // Create goal message
+            float step = 0.2;
+            Eigen::Isometry3d pose1;
+            pose1.setIdentity();
+            pose1.translate(Eigen::Vector3d(robot_x, robot_y, 0));
+            Eigen::Isometry3d pose2;
+
+            int i = 0;
+            bool push_goal_forwards = true;
+            while (push_goal_forwards && i < route_.size()) 
+            {
+                pose2.setIdentity();
+                pose2.translate(Eigen::Vector3d(route_[i].x(), route_[i].y(), 0));
+                if (!local_planner_.isStraightPathValid(pose1, pose2, step))
+                {
+                    break;
+                }
+                i++;
+            } 
+
+            if (i == route_.size()) {
+                i--;
+            }
+
             geometry_msgs::PoseStamped target;
-            target.pose.position.x = route_.begin()->x();
-            target.pose.position.y = route_.begin()->y();
+            // target.pose.position.x = route_.begin()->x();
+            // target.pose.position.y = route_.begin()->y();
+            target.pose.position.x = route_[i].x();
+            target.pose.position.y = route_[i].y();
             target.pose.position.z = 0.25;
             target.header.frame_id = goal_frame_;
             goal_pub_.publish(target);
