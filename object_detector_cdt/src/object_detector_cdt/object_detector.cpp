@@ -389,13 +389,13 @@ cv::Mat ObjectDetector::applyColourFilter(const cv::Mat &in_image_bgr, const Col
     // cv::imwrite("hsv.png", in_image_hsv);
     if (colour == Colour::RED) {
         cv::Mat mask2;
-        inRange(in_image_hsv, cv::Scalar(  0./360.*255,  30./100.*255,  17./100.*255), cv::Scalar( 36./360.*255, 100./100.*255, 100./100.*255), mask);
-        inRange(in_image_hsv, cv::Scalar(  320./360.*255,  30./100.*255,  17./100.*255), cv::Scalar( 359./360.*255, 100./100.*255, 100./100.*255), mask2);
+        inRange(in_image_hsv, cv::Scalar(  0./360.*255,  40./100.*255, 20./100.*255), cv::Scalar( 36./360.*255, 100./100.*255, 100./100.*255), mask);
+        inRange(in_image_hsv, cv::Scalar(  320./360.*255,  40./100.*255,  20./100.*255), cv::Scalar( 359./360.*255, 100./100.*255, 100./100.*255), mask2);
         mask = mask | mask2;
     } else if (colour == Colour::YELLOW) {
         // inRange(in_image_hsv, cv::Scalar(  28.,  194,  30), cv::Scalar( 68., 255, 255), mask);
         // inRange(in_image_hsv, cv::Scalar(  47./360.*255,  15./100.*255,  15./100.*255), cv::Scalar( 78./360.*255, 100./100.*255, 100./100.*255), mask);
-        inRange(in_image_hsv, cv::Scalar(  47./2,  15./100.*255,  15./100.*255), cv::Scalar( 78./2, 100./100.*255, 100./100.*255), mask);
+        inRange(in_image_hsv, cv::Scalar(  47./2,  15./100.*255,  20./100.*255), cv::Scalar( 78./2, 100./100.*255, 100./100.*255), mask);
         limit = .04;
     } else if (colour == Colour::GREEN) {
         // inRange(in_image_hsv, cv::Scalar(  83./360.*255,  30./100.*255,  17./100.*255), cv::Scalar( 154./360.*255, 100./100.*255, 100./100.*255), mask);
@@ -517,6 +517,42 @@ bool ObjectDetector::recognizeObject(const cv::Mat &in_image, const Colour &colo
     {
         return false;
     }
+
+    // cv::Mat in_image_hsv;
+    // cv::cvtColor(in_image, in_image_hsv, cv::COLOR_BGR2HSV);
+
+    // if (colour == Colour::YELLOW){
+    //     std::string img_name =  "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_yellow.png";
+    //     cv::imwrite(img_name, in_image );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_yellow_filt.png";
+    //     cv::imwrite(img_name ,in_image_filt );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_yellow_hsv.png";
+    //     cv::imwrite(img_name ,in_image_hsv );
+    // }
+    // else if (colour == Colour::RED){
+    //     std::string img_name =  "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_red.png";
+    //     cv::imwrite(img_name, in_image );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_red_filt.png";
+    //     cv::imwrite(img_name ,in_image_filt );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_red_hsv.png";
+    //     cv::imwrite(img_name ,in_image_hsv );
+    // }
+    // else if (colour == Colour::BLUE){
+    //     std::string img_name =  "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_blue.png";
+    //     cv::imwrite(img_name, in_image );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_blue_filt.png";
+    //     cv::imwrite(img_name ,in_image_filt );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_blue_hsv.png";
+    //     cv::imwrite(img_name ,in_image_hsv );
+    // }
+    // else if (colour == Colour::GREEN){
+    //     std::string img_name =  "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_green.png";
+    //     cv::imwrite(img_name, in_image );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_green_filt.png";
+    //     cv::imwrite(img_name ,in_image_filt );
+    //     img_name =   "/home/ori/catkin_ws/images/" +std::to_string(ros::Time::now().toSec()) + "_green_hsv.png";
+    //     cv::imwrite(img_name ,in_image_hsv );
+    // }
 
     if(getObjectPosition(obj_center_x,obj_center_y,in_header,obj_depth,report_out))
     {
