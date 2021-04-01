@@ -1,4 +1,5 @@
 #include <world_explorer_cdt/graph_planner.h>
+#include <algorithm>
 
 GraphPlanner::GraphPlanner(){}
 
@@ -170,7 +171,7 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
         current_node_id = next_node_id;
 
     }
-
+    std::reverse(route.begin(),route.end());
 
 
     // TODO extract the final route

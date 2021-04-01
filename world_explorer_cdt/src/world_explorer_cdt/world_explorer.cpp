@@ -118,6 +118,10 @@ void WorldExplorer::frontiersCallback(const cdt_msgs::Frontiers& in_frontiers)
 void WorldExplorer::graphCallback(const cdt_msgs::Graph& in_graph)
 {
     // Set the graph structure to graph planner
+    int num_nodes = graph_.nodes.size();
+    if (num_nodes != in_graph.nodes.size()){
+        graph_navigation_ = false;
+    }
     graph_planner_.setGraph(in_graph);
     graph_ = in_graph;
 }
@@ -168,6 +172,7 @@ void WorldExplorer::plan()
         // here we just use the first one as an example
         Eigen::Vector2d pose_goal = goals.at(0);
         if (local_planner_.isInTraversablity(pose_goal)) {  // Only use local planner if it can reach that goal effectivelly
+            graph_navigation_ = false;
             // Local Planner (RRT)
             // TODO Plan a route to the most suitable frontier
             int goal_ind = 0;
@@ -181,7 +186,13 @@ void WorldExplorer::plan()
             }
         } else {
             ROS_INFO("Plotting a path with Dijkstra");
-            graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+            if (!graph_navigation_)
+            {
+                graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+                graph_navigation_ = true;
+            } else {
+                ROS_INFO("Following old plan");
+            }
         }
 
         // TODO Graph Planner

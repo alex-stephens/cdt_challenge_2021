@@ -69,6 +69,8 @@ class WorldExplorer
     std::string goal_frame_;
     std::string base_frame_;
 
+    bool graph_navigation_ = false;
+
     double planning_time_ = 0.5;
     double path_execute_limit_ = 100.0;
 
