@@ -274,6 +274,7 @@ bool LocalPlanner::isPoseValid(const Eigen::Isometry3d& pose)
     return true;
 }
 
+
 bool LocalPlanner::isStraightPathValid(const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2, float step)
 {
     float x1 = pose1.translation().x();
@@ -298,4 +299,12 @@ bool LocalPlanner::isStraightPathValid(const Eigen::Isometry3d& pose1, const Eig
     }
 
     return true;
+}
+
+
+bool LocalPlanner::isInTraversablity(const Eigen::Vector2d goal)
+{
+    grid_map::Position query_point;
+    query_point = grid_map::Position(goal(0), goal(1));
+    return traversability_.isInside(query_point);
 }

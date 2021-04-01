@@ -167,20 +167,22 @@ void WorldExplorer::plan()
         // TODO Choose a frontier, work it off if it is valid and send it to the position controller
         // here we just use the first one as an example
         Eigen::Vector2d pose_goal = goals.at(0);
-
-        // Local Planner (RRT)
-        // TODO Plan a route to the most suitable frontier
-        int goal_ind = 0;
-        while (!local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_)){
-            goal_ind++;
-            if (goal_ind >= goals.size()) {
-                ROS_INFO("Can't find a suitable frontier with a path");
-                break;
+        if (local_planner_.isInTraversablity(pose_goal)) {  // Only use local planner if it can reach that goal effectivelly
+            // Local Planner (RRT)
+            // TODO Plan a route to the most suitable frontier
+            int goal_ind = 0;
+            while (!local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_)){
+                goal_ind++;
+                if (goal_ind >= goals.size()) {
+                    ROS_INFO("Can't find a suitable frontier with a path");
+                    break;
+                }
+                Eigen::Vector2d pose_goal = goals.at(goal_ind);
             }
-            Eigen::Vector2d pose_goal = goals.at(goal_ind);
+        } else {
+            ROS_INFO("Plotting a path with Dijkstra");
+            graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
         }
-
-        // some more reasoning to be done here....
 
         // TODO Graph Planner
         //graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);

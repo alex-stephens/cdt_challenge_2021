@@ -73,4 +73,6 @@ public:
 
     bool isStraightPathValid(const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2, float step);
 
+    bool isInTraversablity(const Eigen::Vector2d goal);
+
 };
