@@ -7,7 +7,7 @@
   <arg name="input_base_frame"  default="base_link"/>
   <arg name="world"             default="arena_simple"/>
   <arg name="team_name"         default="Simulated sheeps"/>
-  <arg name="team_member_names" default="Alex, Benjamin, Laurynas, Lisa"/>
+  <arg name="team_member_names" default="Alex, Benjamin R, Laurynas, Lisa"/>
 
   <!-- Launch explored space visualization -->
   <node pkg="cdt_visualizations" type="explored_space_vis_node" name="explored_space_vis" output="screen">
