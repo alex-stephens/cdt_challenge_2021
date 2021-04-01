@@ -356,12 +356,12 @@ void WorldExplorer::plan()
         {
             // Create goal message
             geometry_msgs::PoseStamped target;
-            target.pose.position.x = route_.back()->x();
-            target.pose.position.y = route_.back()->y();
+            target.pose.position.x = route_.back().x();
+            target.pose.position.y = route_.back().y();
             target.pose.position.z = 0.25;
             target.header.frame_id = goal_frame_;
             goal_pub_.publish(target);
-            ROS_DEBUG_STREAM("Sending target " << route_.back()->transpose());
+            ROS_DEBUG_STREAM("Sending target " << route_.back().transpose());
 
             // Visualize route (plan)
             nav_msgs::Path plan;
@@ -381,7 +381,7 @@ void WorldExplorer::plan()
             }
             plan.poses.push_back(pose);
             std::reverse(plan.poses.begin(),plan.poses.end());
-            
+
             plan_pub_.publish(plan);
         } 
     }
