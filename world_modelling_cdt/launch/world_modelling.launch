@@ -34,7 +34,7 @@
     <param name="distance_to_delete_frontier"         value="4.0"/>
     <param name="frontier_min_separation"             value="1.2"/>
     <param name="frontier_search_angle_resolution"    value="3"/>  <!-- Degrees -->
-    <param name="frontier_search_angle"               value="180"/> <!-- Degrees -->
+    <param name="frontier_search_angle"               value="135"/> <!-- Degrees -->
 
     <param name="trav_check_distance"                 value="0.2"/>
     <param name="trav_gradient_limit"                 value="0.1"/>

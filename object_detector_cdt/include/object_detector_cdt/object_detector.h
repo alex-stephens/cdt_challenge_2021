@@ -38,6 +38,20 @@ enum Colour { RED=0, YELLOW=1, GREEN=2,  BLUE=3 };
 
 class ObjectDetector
 {
+    struct Report{
+        cdt_msgs::Object obj_;
+        double bb_width_;
+        double bb_height_;
+        double cam_x_;
+        double cam_y_;
+        double cam_z_;
+        int nb_inliers_;
+    };
+
+    struct CompReports {
+        bool operator() (Report i,Report j) { return (i.nb_inliers_<j.nb_inliers_);}
+    } compareReports_;
+
     // Members
     // Image subscriber
     image_transport::Subscriber image_sub_;
@@ -55,6 +69,15 @@ class ObjectDetector
 
     // List of detected objects
     cdt_msgs::ObjectList detected_objects_;
+    std::vector<Report> detected_dogs_;
+    std::vector<Report> detected_barrows_;
+    std::vector<Report> detected_barrels_;
+    std::vector<Report> detected_computers_;
+
+
+    // Time since last obs for each object
+    double last_time_dog_, last_time_barrel_, last_time_barrow_, last_time_computer_;
+    double timeout_limit_, max_nb_obs_;
 
     // Input topics
     std::string input_image_topic_;
@@ -76,9 +99,12 @@ class ObjectDetector
     double camera_cx_; // Intrinsic calibration: Camera center (in pixels)
     double camera_cy_; // Intrinsic calibration: Camera center (in pixels)
 
+    double img_height_, img_width_;
+    
     // Objects' heights
     double barrel_real_height_, barrow_real_height_, computer_real_height_, dog_real_height_;
-    double angle_margin_;
+    double barrel_real_radius_, barrow_real_radius_, computer_real_radius_, dog_real_radius_;
+    double hor_angle_margin_, ver_angle_margin_;
 public:
     // Constructor
     ObjectDetector(ros::NodeHandle &nh);
@@ -88,8 +114,10 @@ private:
     void readParameters(ros::NodeHandle &nh);
 
     //Determine object position
-    bool getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, double &x, double &y, double &z);
+    bool getObjectPosition(const float &pixelx, const float &pixely, const std_msgs::Header &imgheader, double obj_depth, Report &report);
 
+    // Find object to report from multiple observations
+    cdt_msgs::Object chooseReport(const std::vector<Report> &reports);
 
     // The callback implements all the actions
     void imageCallback(const sensor_msgs::ImageConstPtr &in_msg);
@@ -112,8 +140,8 @@ private:
 
     // Implements the procedures to recognize objects
 
-    bool recognizeObject(const cv::Mat &in_image, const Colour &colour, const std_msgs::Header &in_header, 
-                                  double& x_map, double& y_map, double& z_map);
+    bool recognizeObject(const cv::Mat &in_image, const Colour &colour, const std_msgs::Header &in_header, double obj_depth, 
+                                  Report &report_out);
                                   
     bool wasObjectDetected(std::string object_name);
 };
